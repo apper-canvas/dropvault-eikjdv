@@ -4,6 +4,10 @@ import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import Home from './pages/Home'
 import NotFound from './pages/NotFound'
+import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
+import Contact from './pages/Contact'
+import Footer from './components/Footer'
 import getIcon from './utils/iconUtils'
 
 function App() {
@@ -47,6 +51,9 @@ function App() {
 
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/contact" element={<Contact />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
 
@@ -64,6 +71,8 @@ function App() {
         className="mt-16 md:mt-0" // Adjust for mobile to avoid overlap with UI
         toastClassName="bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-surface-100 shadow-soft"
       />
+      
+      <Footer />
     </>
   )
 }
