@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'react-toastify'
 import PageLayout from '../components/PageLayout'
+import contactMessageService from '../services/contactMessageService'
 import getIcon from '../utils/iconUtils'
 
 export default function Contact() {
@@ -63,18 +64,32 @@ export default function Contact() {
     if (validateForm()) {
       setIsSubmitting(true)
       
-      // Simulate API call
-      setTimeout(() => {
-        toast.success('Your message has been sent successfully!', {
-          icon: "✅"
+      // Prepare message data for backend
+      const messageData = {
+        Name: formData.name,
+        email: formData.email,
+        subject: formData.subject,
+        message: formData.message
+      };
+      
+      // Send message to backend
+      contactMessageService.createContactMessage(messageData)
+        .then(response => {
+          toast.success('Your message has been sent successfully!', {
+            icon: "✅"
+          });
+          
+          // Reset form
+          setFormData({
+            name: '',
+            email: '',
+            subject: '',
+            message: ''
+          });
         })
-        
-        // Reset form
-        setFormData({
-          name: '',
-          email: '',
-          subject: '',
-          message: ''
+        .catch(error => {
+          console.error('Error sending message:', error);
+          toast.error('Failed to send message. Please try again later.');
         })
         
         setIsSubmitting(false)

@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'react-toastify'
+import fileService from '../services/fileService'
 import getIcon from '../utils/iconUtils'
 
-export default function MainFeature() {
+export default function MainFeature({ onFileUploaded }) {
   const [isDragging, setIsDragging] = useState(false)
   const [files, setFiles] = useState([])
   const [uploading, setUploading] = useState(false)
@@ -77,23 +78,108 @@ export default function MainFeature() {
     if (files.length === 0 || uploading) return
     
     setUploading(true)
+    let uploadedCount = 0;
+    let errorCount = 0;
     
     // Create initial progress state for all files
-    const initialProgress = {}
+    const initialProgress = {};
     files.forEach(file => {
-      initialProgress[file.id] = 0
-      // Update file status to uploading
-      setFiles(prev => prev.map(f => 
-        f.id === file.id ? { ...f, status: 'uploading' } : f
-      ))
-    })
-    setUploadProgress(initialProgress)
+      if (file.status !== 'complete') {
+        initialProgress[file.id] = 0;
+        // Update file status to uploading
+        setFiles(prev => prev.map(f => 
+          f.id === file.id ? { ...f, status: 'uploading' } : f
+        ));
+      }
+    });
+    setUploadProgress(initialProgress);
     
-    // Simulate upload for each file
-    files.forEach(file => {
-      simulateFileUpload(file.id, file.size)
-    })
+    // Process uploads sequentially to avoid overwhelming the backend
+    const filesToUpload = files.filter(file => file.status !== 'complete');
+    
+    for (const file of filesToUpload) {
+      try {
+        // Simulate progress updates while actually uploading
+        const uploadPromise = uploadFileToBackend(file);
+        simulateFileUpload(file.id, file.size);
+        
+        // Wait for upload to complete
+        await uploadPromise;
+        uploadedCount++;
+      } catch (error) {
+        console.error(`Error uploading file ${file.name}:`, error);
+        
+        // Mark file as error
+        setFiles(prev => prev.map(f => 
+          f.id === file.id ? { ...f, status: 'error' } : f
+        ));
+        
+        errorCount++;
+      }
+    }
+    
+    // When all uploads are done
+    setUploading(false);
+    
+    if (uploadedCount > 0) {
+      toast.success(`${uploadedCount} file${uploadedCount !== 1 ? 's' : ''} uploaded successfully!`);
+      if (typeof onFileUploaded === 'function') onFileUploaded();
+    }
+    
+    if (errorCount > 0) {
+      toast.error(`Failed to upload ${errorCount} file${errorCount !== 1 ? 's' : ''}`);
+    }
   }
+  
+  // Upload a file to the backend
+  const uploadFileToBackend = async (file) => {
+    try {
+      // Create file record in the backend
+      const fileData = {
+        Name: file.name,
+        size: file.size,
+        type: getMimeCategory(file.file.type),
+        date: new Date().toISOString(),
+        status: 'complete',
+        progress: 100
+      };
+      
+      // Upload to backend
+      const response = await fileService.createFile(fileData);
+      
+      // Update file status to complete
+      setFiles(prev => prev.map(f => 
+        f.id === file.id ? { ...f, status: 'complete', backendId: response.Id } : f
+      ));
+      
+      setUploadProgress(prev => ({
+        ...prev,
+        [file.id]: 100
+      }));
+      
+      return response;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      throw error;
+    }
+  };
+  
+  // Determine the category of a MIME type
+  const getMimeCategory = (mimeType) => {
+    if (!mimeType) return 'unknown';
+    
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType.startsWith('text/')) return 'text';
+    if (mimeType.includes('pdf')) return 'pdf';
+    if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return 'spreadsheet';
+    if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return 'presentation';
+    if (mimeType.includes('word') || mimeType.includes('document')) return 'doc';
+    if (mimeType.includes('zip') || mimeType.includes('compressed')) return 'compressed';
+    
+    return 'unknown';
+  };
   
   const simulateFileUpload = (fileId, fileSize) => {
     // Simulate an upload with progress updates
